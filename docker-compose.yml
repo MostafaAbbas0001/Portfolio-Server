@@ -1,0 +1,75 @@
+name: portfolio-server
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: portfolio-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in server/.env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in server/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in server/.env}
+
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:?Set POSTGRES_PORT in server/.env}:5432"
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:?Set POSTGRES_USER in server/.env} -d ${POSTGRES_DB:?Set POSTGRES_DB in server/.env}"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    networks:
+      - portfolio-mostafa
+
+
+  server:
+    build:
+      context: .
+
+    image: portfolio-api:latest
+    container_name: portfolio-api
+    restart: unless-stopped
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    env_file:
+      - .env
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:?Set ASPNETCORE_ENVIRONMENT in server/.env}
+
+      DATABASE_URL: Host=postgres;Port=5432;Database=${POSTGRES_DB:?Set POSTGRES_DB in server/.env};Username=${POSTGRES_USER:?Set POSTGRES_USER in server/.env};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in server/.env}
+
+      CORS_ORIGINS: ${CORS_ORIGINS:?Set CORS_ORIGINS in server/.env}
+
+    ports:
+      - "127.0.0.1:${SERVER_PORT:?Set SERVER_PORT in server/.env}:8080"
+
+    volumes:
+      - uploads-data:/app/Uploads
+
+    networks:
+      - portfolio-mostafa
+
+
+volumes:
+  postgres-data:
+
+  uploads-data:
+    name: portfolio-uploads
+
+
+networks:
+  portfolio-mostafa:
+    external: true
